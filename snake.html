@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Snake Game</title>
+        <style>
+        canvas {
+            display: block;
+            margin: 0 auto;
+            background-color: #eee;
+            border: 1px solid #000;
+        }
+        h2 {
+            text-align: center;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1;
+        }
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px;
+            text-align: center;
+            border-radius: 10px;
+        }
+        .modal button {
+            background-color: #007BFF;
+            border: none;
+            color: #fff;
+            padding: 8px 16px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        </style>
+    </head>
+    <body>
+        <h2>抓到 <span id="count"></span> 個晴云</h2>
+        <div id="gameOverModal" class="modal">
+            <div class="modal-content">
+                <h1><span id="gameOverMessage">死掉了！</span></h1>
+                <button id="restartButton">重玩一次</button>
+            </div>
+        </div>
+        <canvas id="game" width="600" height="600"></canvas>
+        <script>
+            const canvas = document.getElementById('game');
+            const ctx = canvas.getContext('2d');
+            const scale = 50;
+            const rows = canvas.height / scale;
+            const cols = canvas.width / scale;
+
+            const usePhoto = true;
+            const fruitImage = new Image();
+            fruitImage.src = 'fruit.png';
+
+            const snakeImage = new Image();
+            snakeImage.src = 'snake.png';
+
+            const runnerImage= new Image();
+            runnerImage.src = 'runner.png';
+
+            let fruit;
+            let snake;
+            let runner;
+
+            const gameOverModal = document.getElementById('gameOverModal');
+            const gameOverMessage = document.getElementById('gameOverMessage');
+
+            const restartButton = document.getElementById('restartButton');
+
+            function showGameOverModal(message, img) {
+                snake.kill();
+                runner.kill();
+
+                gameOverModal.style.display = 'block';
+                gameOverMessage.innerText = message;
+            }
+
+            function hideGameOverModal() {
+                gameOverModal.style.display = 'none';
+            }
+
+            function resetGame() {
+                snake = new Snake();
+                fruit = new Fruit();
+                fruit.pickLocation();
+
+                runner = new Runner();
+                runner.pickLocation();
+            }
+
+            (function setup() {
+                resetGame();
+
+                window.setInterval(() => {
+                    if (snake.alive) {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        fruit.draw();
+                        snake.update();
+                        snake.draw();
+
+                        runner.move();
+                        runner.draw();
+
+                        if (snake.eat(fruit)) {
+                            fruit.pickLocation();
+                        }
+
+                        snake.checkCollision();
+                        snake.checkMeet(runner);
+                    }
+                }, 250);
+            })();
+
+            restartButton.addEventListener('click', () => {
+                hideGameOverModal();
+                resetGame();
+            });
+
+            window.addEventListener('keydown', ((evt) => {
+                const direction = evt.key.replace('Arrow', '');
+                snake.changeDirection(direction);
+            }));
+
+            function Snake() {
+                this.x = 0;
+                this.y = 0;
+                this.xSpeed = scale;
+                this.ySpeed = 0;
+                this.tail = [];
+                this.total = 0;
+                this.alive = true;
+
+                this.kill = function() {
+                    this.alive = false;
+                }
+
+                this.draw = function() {
+                    ctx.fillStyle = '#000';
+
+                    for (let i = 0; i < this.tail.length; i++) {
+                        if (usePhoto == true) {
+                            ctx.drawImage(fruitImage, this.tail[i].x, this.tail[i].y, scale, scale);
+                        } else {
+                            ctx.fillRect(this.tail[i].x, this.tail[i].y, scale, scale);
+                        }
+                    }
+
+                    if (usePhoto == true) {
+                        ctx.drawImage(snakeImage, this.x, this.y, scale, scale);
+                    } else {
+                        ctx.fillRect(this.x, this.y, scale, scale);
+                    }
+                    document.getElementById('count').innerText = this.total;
+                }
+
+                this.update = function() {
+                    for (let i = 0; i < this.tail.length - 1; i++) {
+                        this.tail[i] = this.tail[i + 1];
+                    }
+
+                    if (this.total >= 1) {
+                        this.tail[this.total - 1] = { x: this.x, y: this.y };
+                    }
+
+                    this.x += this.xSpeed;
+                    this.y += this.ySpeed;
+
+                    if (this.x >= canvas.width) {
+                        this.x = 0;
+                    }
+
+                    if (this.y >= canvas.height) {
+                        this.y = 0;
+                    }
+
+                    if (this.x < 0) {
+                        this.x = canvas.width;
+                    }
+
+                    if (this.y < 0) {
+                        this.y = canvas.height;
+                    }
+                }
+
+                this.changeDirection = function(direction) {
+                    let noTail = (this.total == 0);
+                    console.log(noTail);
+                    switch (direction) {
+                        case 'Up':
+                            if (noTail || this.ySpeed === 0) {
+                                this.xSpeed = 0;
+                                this.ySpeed = -scale;
+                            }
+                            break;
+                        case 'Down':
+                            if (noTail || this.ySpeed === 0) {
+                                this.xSpeed = 0;
+                                this.ySpeed = scale;
+                            }
+                            break;
+                        case 'Left':
+                            if (noTail || this.xSpeed === 0) {
+                                this.xSpeed = -scale;
+                                this.ySpeed = 0;
+                            }
+                            break;
+                        case 'Right':
+                            if (noTail || this.xSpeed === 0) {
+                                this.xSpeed = scale;
+                                this.ySpeed = 0;
+                            }
+                            break;
+                    }
+                }
+
+                this.eat = function(fruit) {
+                    if (this.x === fruit.x && this.y === fruit.y) {
+                        this.total++;
+                        return true;
+                    }
+                    return false;
+                }
+
+                this.checkMeet= function(runner) {
+                    if (runner.x == this.x && runner.y == this.y) {
+                        showGameOverModal('品瑜:嘻嘻～被本小姐抓到了吧！');
+                    } else {
+                        for (let i = 0; i < this.tail.length; i++) {
+                            if (runner.x === this.tail[i].x && runner.y === this.tail[i].y) {
+                                showGameOverModal('品瑜:得罪了本姑娘還想跑！？');
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                this.checkCollision = function() {
+                    for (let i = 0; i < this.tail.length; i++) {
+                        if (this.x === this.tail[i].x && this.y === this.tail[i].y) {
+                            showGameOverModal('皓天:啊～撞到晴云了!');
+                            break;
+                        }
+                    }
+                }
+            }
+
+            function Fruit() {
+                this.x;
+                this.y;
+
+                this.pickLocation = function() {
+                    this.x = (Math.floor(Math.random() * cols)) * scale;
+                    this.y = (Math.floor(Math.random() * rows)) * scale;
+                }
+
+                this.draw = function() {
+                    ctx.fillStyle = 'red';
+                    if (usePhoto == true) {
+                        ctx.drawImage(fruitImage, this.x, this.y, scale, scale);
+                    } else {
+                        ctx.fillRect(this.x, this.y, scale, scale);
+                    }
+                }
+            }
+
+            function Runner() {
+                this.x;
+                this.y;
+                this.alive = true;
+
+                this.pickLocation = function() {
+                    this.x = (Math.floor(Math.random() * cols)) * scale;
+                    this.y = (Math.floor(Math.random() * rows)) * scale;
+                }
+
+                this.kill = function() {
+                    this.alive = false;
+                }
+
+                this.move = function() {
+                    let dx = 0;
+                    let dy = 0;
+                    if (Math.random() > 0.5) {
+                        dx = (Math.floor(Math.random() * 3) - 1) * scale;
+                    } else {
+                        dy = (Math.floor(Math.random() * 3) - 1) * scale;
+                    }
+
+                    this.x += dx;
+                    this.y += dy;
+
+                    if (this.x > canvas.width) {
+                        this.x = 0;
+                    }
+
+                    if (this.y > canvas.height) {
+                        this.y = 0;
+                    }
+
+                    if (this.x < 0) {
+                        this.x = canvas.width;
+                    }
+
+                    if (this.y < 0) {
+                        this.y = canvas.height;
+                    }
+                }
+
+                this.draw = function() {
+                    ctx.fillStyle = 'blue';
+                    if (usePhoto == true) {
+                        ctx.drawImage(runnerImage, this.x, this.y, scale, scale);
+                    } else {
+                        ctx.fillRect(this.x, this.y, scale, scale);
+                    }
+                }
+            }
+        </script>
+
+
